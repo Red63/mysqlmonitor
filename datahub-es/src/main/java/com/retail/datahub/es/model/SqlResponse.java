@@ -1,6 +1,5 @@
 package com.retail.datahub.es.model;
 
-import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.retail.datahub.es.exception.EsOperationException;
 import com.retail.datahub.es.util.JSONUtil;
@@ -10,12 +9,6 @@ import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHitField;
 import org.elasticsearch.search.SearchHits;
 
-import java.beans.BeanInfo;
-import java.beans.Introspector;
-import java.beans.PropertyDescriptor;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.*;
 
 /**
@@ -201,27 +194,29 @@ public class SqlResponse {
             }
 
             row.put(prentKey, map.get("key"));
-            String subKey = subKey(map);
+            List<String> subkeys = subKey(map);
 
-            List<Map<String, Object>> subs = null;
-            if(StringUtils.isNotEmpty(subKey)){
-                subs = (List<Map<String, Object>>) ((Map<String, Object>) map.get(subKey)).get("buckets");
-            }
-
-            if(subs == null){
-                Map<String, Object> endMap = (Map<String, Object>) map.get(subKey);
-                if(endMap != null){
-                    if(endMap.get("value") != null){
-                        row.put(subKey, endMap.get("value"));
-                    } else {
-                        row.put(subKey, null);
-                    }
+            for (String subKey: subkeys){
+                List<Map<String, Object>> subs = null;
+                if(StringUtils.isNotEmpty(subKey)){
+                    subs = (List<Map<String, Object>>) ((Map<String, Object>) map.get(subKey)).get("buckets");
                 }
 
-                callChild = false;
-            } else {
-                callChild = true;
-                getSubBuckets(subs, subKey);
+                if(subs == null){
+                    Map<String, Object> endMap = (Map<String, Object>) map.get(subKey);
+                    if(endMap != null){
+                        if(endMap.get("value") != null){
+                            row.put(subKey, endMap.get("value"));
+                        } else {
+                            row.put(subKey, null);
+                        }
+                    }
+
+                    callChild = false;
+                } else {
+                    callChild = true;
+                    getSubBuckets(subs, subKey);
+                }
             }
 
             rows.add(row);
@@ -234,19 +229,19 @@ public class SqlResponse {
      * @param bucket
      * @return
      */
-    private String subKey(Map<String, Object> bucket){
-        String subkey = "";
+    private List<String> subKey(Map<String, Object> bucket){
+        List<String> subkeys = new ArrayList<>();
 
         for (Map.Entry entry : bucket.entrySet()){
             if (!StringUtils.equals("doc_count", String.valueOf(entry.getKey()))
                     && !StringUtils.equals("doc_count_error_upper_bound", String.valueOf(entry.getKey()))
                     && !StringUtils.equals("key", String.valueOf(entry.getKey()))){
 
-                subkey = String.valueOf(entry.getKey());
+                subkeys.add(String.valueOf(entry.getKey()));
             }
         }
 
-        return subkey;
+        return subkeys;
     }
 
 }

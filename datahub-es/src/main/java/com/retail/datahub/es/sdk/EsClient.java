@@ -26,6 +26,7 @@ import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.SearchHit;
 import org.nlpcn.es4sql.SearchDao;
 import org.nlpcn.es4sql.exception.SqlParseException;
+import org.nlpcn.es4sql.query.SqlElasticRequestBuilder;
 import org.nlpcn.es4sql.query.SqlElasticSearchRequestBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +34,8 @@ import org.slf4j.LoggerFactory;
 import java.beans.BeanInfo;
 import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -364,6 +367,23 @@ public class EsClient {
     public EsClient queryAsSQL(){
         this.searchDao = new SearchDao(client);
         return this;
+    }
+
+    /**
+     * sql翻译成es查询DSL
+     * @param sql
+     * @return
+     * @throws SQLFeatureNotSupportedException
+     * @throws SqlParseException
+     * @throws InvocationTargetException
+     * @throws NoSuchMethodException
+     * @throws IllegalAccessException
+     * @throws IOException
+     */
+    public String explain(String sql) throws SQLFeatureNotSupportedException, SqlParseException, InvocationTargetException, NoSuchMethodException, IllegalAccessException, IOException {
+        if (searchDao == null) throw new EsOperationException("sql searchDao is null, you must call EsClient.queryAsSQL...");
+        SqlElasticRequestBuilder requestBuilder = searchDao.explain(sql).explain();
+        return requestBuilder.explain();
     }
 
     /**
