@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+	<appender name="LOG_COMPLETEPAY_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<file>${dynamic.log.path}/data-listener.log</file>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<fileNamePattern>${dynamic.log.path}/data-listener.log%d{yyyy-MM-dd}
+			</fileNamePattern>
+			<maxHistory>7</maxHistory>
+		</rollingPolicy>
+		<encoder>
+			<pattern>[%p] %d{yyyy-MM-dd HH:mm:ss.SSS} [%t][%c]%C:%L - %m %n
+			</pattern>
+		</encoder>
+	</appender>
+
+	<appender name="LOG_MSG_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<file>${dynamic.log.path}/data-listener-msg.log</file>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<fileNamePattern>${dynamic.log.path}/data-listener-msg.log%d{yyyy-MM-dd}
+			</fileNamePattern>
+			<maxHistory>7</maxHistory>
+		</rollingPolicy>
+		<encoder>
+			<pattern>[%p] %d{yyyy-MM-dd HH:mm:ss.SSS} [%t][%c]%C:%L - %m %n
+			</pattern>
+		</encoder>
+	</appender>
+
+	<!-- log output to console -->
+	<appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+		<encoder>
+			<pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+		</encoder>
+	</appender>
+
+	<!-- 敏感数据，操作日志 -->
+	<logger name="data_listener" level="INFO" additivity="false">
+		<appender-ref ref="LOG_COMPLETEPAY_FILE"/>
+	</logger>
+
+	<logger name="data_listener_msg" level="INFO" additivity="false">
+		<appender-ref ref="LOG_MSG_FILE"/>
+		<appender-ref ref="CONSOLE" />
+	</logger>
+
+	<logger name="com.retail.datahub.base" level="INFO" additivity="false">
+		<appender-ref ref="LOG_MSG_FILE"/>
+		<appender-ref ref="CONSOLE" />
+	</logger>
+
+	<root level="${log.level}">
+		<appender-ref ref="LOG_COMPLETEPAY_FILE" />
+		<appender-ref ref="CONSOLE" />
+	</root>
+</configuration>

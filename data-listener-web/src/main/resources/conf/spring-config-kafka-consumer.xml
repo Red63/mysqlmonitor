@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	   xmlns:context="http://www.springframework.org/schema/context"
+	   xmlns:aop="http://www.springframework.org/schema/aop"
+	   xsi:schemaLocation="http://www.springframework.org/schema/beans
+       		http://www.springframework.org/schema/beans/spring-beans.xsd 
+       		http://www.springframework.org/schema/context 
+       		http://www.springframework.org/schema/context/spring-context.xsd
+       		http://www.springframework.org/schema/aop 
+       		http://www.springframework.org/schema/aop/spring-aop.xsd"
+	   default-autowire="byName">
+
+	<context:annotation-config/>
+
+
+	<!-- 消费者业务处理handler -->
+	<bean id="consumerTestHandler" class="com.retail.data.listener.MsgConsumer" />
+
+
+
+	<!-- Connector -->
+	<bean id="dmgConnectionFactory" class="com.dmall.dmg.sdk.core.ConnectionFactory">
+		<property name="clusterId" value="1" />
+		<property name="appKey" value="96fdb838c3acc668956a0b27f0b9940216aca482" />
+		<property name="secretKey" value="00077f396f0a343c92b23256d4cdad0e59f16d55" />
+		<property name="authUrl" value="http://dev.dmg.wumart.com/hessian/dmgService" />
+	</bean>
+	<!-- 转码器 -->
+	<bean id="codeFactory" class="com.retail.commons.dkafka.code.HessianCodecFactory" />
+
+
+	<bean id="consumerMessageAdapterHandler" class="com.retail.commons.dkafka.MessageAdapterHandler" >
+		<property name="codeFactory" ref="codeFactory"></property>
+		<property name="eventList">
+			<list>
+				<ref bean="consumerTestHandler"/>
+			</list>
+		</property>
+	</bean>
+	<!-- 消费者 -->
+	<bean id="messageHandler" class="com.retail.commons.dkafka.consumer.DefaultEventConsumer">
+		<property name="messageAdapterHandler" ref="consumerMessageAdapterHandler"></property>
+	</bean>
+
+
+	<!-- Consumer -->
+	<bean id="dmgConsumer" class="com.dmall.dmg.sdk.core.consumer.kafka.KafkaConsumerContainer">
+		<property name="connectionFactory" ref="dmgConnectionFactory" />
+		<property name="handler" ref="messageHandler" />
+		<property name="properties">
+			<props>
+				<prop key="group.id">rtl_es_test</prop>
+				<prop key="topic.name">datahub_rtl_contract_test</prop>
+				<prop key="num.consumers">1</prop>
+				<prop key="auto.offset.reset">smallest</prop>
+				<prop key="zookeeper.connection.timeout.ms">1000000</prop>
+				<prop key="zookeeper.session.timeout.ms">60000</prop>
+				<prop key="auto.commit.enable">false</prop>
+				<prop key="rebalance.max.retries">10</prop>
+				<prop key="rebalance.backoff.ms">30000</prop>
+				<prop key="fetch.message.max.bytes">1048576</prop><!--线上值为5242880-->
+			</props>
+		</property>
+	</bean>
+
+	<!-- Consumer -->
+	<bean id="dmgConsumer" class="com.dmall.dmg.sdk.core.consumer.kafka.KafkaConsumerContainer">
+		<property name="connectionFactory" ref="dmgConnectionFactory" />
+		<property name="handler" ref="messageHandler" />
+		<property name="properties">
+			<props>
+				<prop key="group.id">rtl_es_test</prop>
+				<prop key="topic.name">datahub_test_test</prop>
+				<prop key="num.consumers">1</prop>
+				<prop key="auto.offset.reset">smallest</prop>
+				<prop key="zookeeper.connection.timeout.ms">1000000</prop>
+				<prop key="zookeeper.session.timeout.ms">60000</prop>
+				<prop key="auto.commit.enable">false</prop>
+				<prop key="rebalance.max.retries">10</prop>
+				<prop key="rebalance.backoff.ms">30000</prop>
+				<prop key="fetch.message.max.bytes">1048576</prop><!--线上值为5242880-->
+			</props>
+		</property>
+	</bean>
+
+
+</beans>

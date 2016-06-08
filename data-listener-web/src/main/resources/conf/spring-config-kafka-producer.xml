@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	   xmlns:context="http://www.springframework.org/schema/context"
+	   xmlns:aop="http://www.springframework.org/schema/aop"
+	   xsi:schemaLocation="http://www.springframework.org/schema/beans
+       		http://www.springframework.org/schema/beans/spring-beans.xsd 
+       		http://www.springframework.org/schema/context 
+       		http://www.springframework.org/schema/context/spring-context.xsd
+       		http://www.springframework.org/schema/aop 
+       		http://www.springframework.org/schema/aop/spring-aop.xsd"
+	   default-autowire="byName">
+
+	<context:annotation-config />
+
+	<!-- Connector -->
+	<bean id="dmgConnectionFactory" class="com.dmall.dmg.sdk.core.ConnectionFactory">
+		<property name="clusterId" value="1" />
+		<property name="appKey" value="96fdb838c3acc668956a0b27f0b9940216aca482" />
+		<property name="secretKey" value="00077f396f0a343c92b23256d4cdad0e59f16d55" />
+		<property name="authUrl" value="http://dev.dmg.wumart.com/hessian/dmgService" />
+	</bean>
+
+	<!--- Product -->
+	<bean id="dmgProducer" class="com.dmall.dmg.sdk.core.producer.KafkaProducer">
+		<property name="connectionFactory" ref="dmgConnectionFactory" />
+		<property name="properties">
+			<props>
+				<prop key="serializer.class">kafka.serializer.DefaultEncoder</prop>
+				<prop key="request.required.acks">-1</prop>
+				<prop key="message.send.max.retries">10</prop>
+				<prop key="retry.backoff.ms">500</prop>
+				<prop key="compression.codec">gzip</prop>
+			</props>
+		</property>
+		<property name="topics">
+			<set>
+				<value>datahub_rtl_contract_test</value>
+				<value>datahub_test_test</value>
+			</set>
+		</property>
+	</bean>
+
+	<!-- 转码器 -->
+	<bean id="codeFactory" class="com.retail.commons.dkafka.code.HessianCodecFactory" />
+	<!-- 消息适适配器Handler -->
+	<bean id="productMessageAdapterHandler" class="com.retail.commons.dkafka.MessageAdapterHandler" >
+		<property name="codeFactory" ref="codeFactory"></property>
+	</bean>
+
+	<!-- 生成者 -->
+	<bean id="mysqlLogProduct" class="com.retail.commons.dkafka.product.DefaultEventProduct">
+		<property name="product" ref="dmgProducer"></property>
+		<property name="messageAdapterHandler" ref="productMessageAdapterHandler"></property>
+	</bean>
+
+</beans>

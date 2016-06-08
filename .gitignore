@@ -1,0 +1,17 @@
+.settings
+.metadata
+*.iml
+*/target
+*.idea
+/target
+target
+.mymetadata
+.checkstyle
+.classpath
+.project
+.class
+.idea
+*.iml
+.DS_Store
+.myhibernatedata
+.svn/

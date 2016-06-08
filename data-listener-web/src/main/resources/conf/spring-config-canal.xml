@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	   xsi:schemaLocation="http://www.springframework.org/schema/beans
+       		http://www.springframework.org/schema/beans/spring-beans.xsd"
+	   default-autowire="byName">
+
+
+	<!--单机模式-->
+	<!--<bean id="simpleCanalClient" class="com.retail.datahub.canal.SimpleCanalClient" init-method="init">
+		<property name="canalhost" value="${canalhost}"/>
+		<property name="canalport" value="${canalport}"/>
+		<property name="destination" value="${destination}" />
+		<property name="listenerdb" value="${listenerdb}"/>
+		<property name="listenertable" value="${listenertable}"/>
+		<property name="event" value="${event}"/>
+		<property name="username" value="${username}"/>
+		<property name="password" value="${password}"/>
+		<property name="topic" value="${topic}"/>
+	</bean>-->
+
+	<!--集群模式-->
+	<!--<bean id="clusterCanalClient" class="com.retail.datahub.canal.ClusterCanalClient" init-method="init">
+		<property name="zkserver" value="${zkserver}"/>
+		<property name="destination" value="${destination}" />
+		<property name="listenerdb" value="${listenerdb}"/>
+		<property name="listenertable" value="${listenertable}"/>
+		<property name="event" value="${event}"/>
+		<property name="username" value="${username}"/>
+		<property name="password" value="${password}"/>
+		<property name="topic" value="${topic}"/>
+	</bean>-->
+
+	<bean id="consumerData" class="com.retail.data.listener.ConsumerData" init-method="init">
+		<property name="zkserver" value="${zkserver}"/>
+		<property name="destination" value="${customer.destination}" />
+		<property name="listenerdb" value="${listenerdb}"/>
+		<property name="listenertable" value="${listenertable}"/>
+		<property name="event" value="${event}"/>
+		<property name="username" value="${username}"/>
+		<property name="password" value="${password}"/>
+	</bean>
+
+	<!--<bean id="contacrtData" class="com.retail.data.listener.ConsumerData" init-method="init">
+		<property name="zkserver" value="${zkserver}"/>
+		<property name="destination" value="${contract.destination}" />
+		<property name="listenerdb" value="${listenerdb}"/>
+		<property name="listenertable" value="${listenertable}"/>
+		<property name="event" value="${event}"/>
+		<property name="username" value="${username}"/>
+		<property name="password" value="${password}"/>
+	</bean>-->
+
+
+	<!-- producer -->
+	<!--<bean id="kafkaProducerFactory" class="com.retail.base.sdk.kafka.message.KafkaProducerFactory" init-method="initSetting">
+		<property name="brokerList" value="${broker.list}"></property>
+	</bean>-->
+</beans>

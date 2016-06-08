@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+	<appender name="LOG_COMPLETEPAY_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<file>../logs/data-listener.log</file>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<fileNamePattern>../logs/data-listener.log%d{yyyy-MM-dd}
+			</fileNamePattern>
+			<maxHistory>7</maxHistory>
+		</rollingPolicy>
+		<encoder>
+			<pattern>[%p] %d{yyyy-MM-dd HH:mm:ss.SSS} [%t][%c]%C:%L - %m %n
+			</pattern>
+		</encoder>
+	</appender>
+
+	<appender name="ERROR_MSG" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<file>../logs/error-msg.log</file>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<fileNamePattern>../logs/error-msg.log%d{yyyy-MM-dd}
+			</fileNamePattern>
+			<maxHistory>7</maxHistory>
+		</rollingPolicy>
+		<encoder>
+			<pattern>[%p] %d{yyyy-MM-dd HH:mm:ss.SSS} [%t][%c]%C:%L - %m %n
+			</pattern>
+		</encoder>
+	</appender>
+
+	<!-- log output to console -->
+	<appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+		<encoder>
+			<pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+		</encoder>
+	</appender>
+
+
+
+	<!-- base -->
+	<logger name="data_listener" level="INFO" additivity="false">
+		<appender-ref ref="LOG_COMPLETEPAY_FILE"/>
+		<appender-ref ref="CONSOLE" />
+	</logger>
+
+
+	<logger name="msg-error" level="INFO" additivity="false">
+		<appender-ref ref="ERROR_MSG"/>
+		<appender-ref ref="CONSOLE" />
+	</logger>
+
+	<root level="INFO">
+		<appender-ref ref="LOG_COMPLETEPAY_FILE" />
+		<appender-ref ref="CONSOLE" />
+	</root>
+</configuration>

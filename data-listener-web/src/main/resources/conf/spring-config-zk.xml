@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean id="zkClient" class="com.retail.datahub.zk.sdk.ZkClient">
+        <property name="zkLists" value="10.13.3.10:2181,10.13.3.12:2181"></property>
+    </bean>
+</beans>
