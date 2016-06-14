@@ -8,7 +8,10 @@ import com.retail.datahub.es.model.SqlResponse;
 import com.retail.datahub.es.sdk.EsClient;
 import com.retail.datahub.es.util.DateUtil;
 import com.retail.datahub.test.domian.User;
+import org.elasticsearch.action.admin.indices.get.GetIndexResponse;
 import org.elasticsearch.action.bulk.BulkResponse;
+import org.elasticsearch.action.delete.DeleteResponse;
+import org.elasticsearch.action.deletebyquery.DeleteByQueryResponse;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.search.aggregations.Aggregation;
 import org.elasticsearch.search.aggregations.Aggregations;
@@ -62,7 +65,7 @@ public class EsTest {
     @Test
     public void objIndex() throws Exception {
         EsClient client = getBean("esClient");
-        User user = new User();
+        /*User user = new User();
         user.setId(2l);
         user.setName("李四");
         user.setCode("001002");
@@ -71,7 +74,13 @@ public class EsTest {
 
         Response response = client.index("my_test", "user", String.valueOf(user.getId()), user);
 
-        System.out.println(JSONObject.toJSONString(response, true));
+        System.out.println(JSONObject.toJSONString(response, true));*/
+
+        Map<String, Object> book = new HashMap<>();
+        book.put("name", "疯狂英语2");
+        book.put("id", "2");
+
+        client.index("my_test", "book", "2", book);
     }
 
     @Test
@@ -193,16 +202,50 @@ public class EsTest {
         }
     }
 
+    @Test
+    public void explainSql(){
+        EsClient client = getBean("esClient");
+
+        String sql = "SELECT max(createDate),max(exeId) FROM contract_index/contract_ledger_index group by billNo,createDate,exeId,executeNo";
+
+        try {
+
+            String dsl = client.queryAsSQL().explain(sql);
+
+            System.out.println(dsl);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Test
+    public void showIndex(){
+        EsClient client = getBean("esClient");
+
+        try {
+
+            System.out.println(client.queryAsSQL().exist("my_test/user"));
+        } catch (SqlParseException e) {
+            e.printStackTrace();
+        } catch (SQLFeatureNotSupportedException e) {
+            e.printStackTrace();
+        }
+    }
+
 
     @Test
      public void queryByBaseSql(){
         EsClient client = getBean("esClient");
 
-        String sql = "select * from my_test/user";
+        String sql = "select * from my_test1/book";
 
         try {
 
-            List<User> results = client.queryAsSQL().select(sql).hitsResult(User.class);
+            SqlResponse response = client.queryAsSQL().select(sql);
+
+
+            List<User> results = response.hitsResult(User.class);
 
             for (User user: results){
                 System.out.println(user.toString());
@@ -222,7 +265,7 @@ public class EsTest {
     public void queryAggBaseSql(){
         EsClient client = getBean("esClient");
 
-        String sql = "SELECT batchId,dbName FROM rtl_contract/contract_bill group by batchId,dbName";
+        String sql = "SELECT count(*) FROM contract_index/contract_ledger_index";
 
         try {
 
@@ -235,5 +278,21 @@ public class EsTest {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+
+    @Test
+    public void deleteIndex(){
+        EsClient client = getBean("esClient");
+
+        String delete = "delete from my_test/book";
+
+        try {
+            client.queryAsSQL().delete(delete);
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+
+        System.out.println("over");
     }
 }

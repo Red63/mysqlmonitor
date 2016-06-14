@@ -11,13 +11,19 @@
     <groupId>com.retail</groupId>
     <modelVersion>4.0.0</modelVersion>
     <artifactId>datahub-es</artifactId>
-    <!--<version>1.5.7</version>-->
+    <!--<version>1.5.8</version>-->
 
 
     <dependencies>
         <dependency>
             <groupId>org.elasticsearch</groupId>
             <artifactId>elasticsearch</artifactId>
+            <version>2.3.1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.elasticsearch.plugin</groupId>
+            <artifactId>delete-by-query</artifactId>
             <version>2.3.1</version>
         </dependency>
 

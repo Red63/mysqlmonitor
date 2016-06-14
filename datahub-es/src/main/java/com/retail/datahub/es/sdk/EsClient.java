@@ -6,6 +6,9 @@ import com.google.common.base.Splitter;
 import com.retail.datahub.es.exception.EsOperationException;
 import com.retail.datahub.es.model.Response;
 import com.retail.datahub.es.model.SqlResponse;
+import org.apache.commons.lang.StringUtils;
+import org.elasticsearch.action.ActionResponse;
+import org.elasticsearch.action.admin.indices.get.GetIndexResponse;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexResponse;
@@ -23,6 +26,7 @@ import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.MultiMatchQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.plugin.deletebyquery.DeleteByQueryPlugin;
 import org.elasticsearch.search.SearchHit;
 import org.nlpcn.es4sql.SearchDao;
 import org.nlpcn.es4sql.exception.SqlParseException;
@@ -107,10 +111,14 @@ public class EsClient {
             }
         }
 
-        Settings settings = Settings.settingsBuilder().put("cluster.name", clusterName).build();
+        Settings settings = Settings.settingsBuilder()
+                .put("cluster.name", clusterName)
+                .build();
 
         this.client = TransportClient.builder()
-                .settings(settings).build()
+                .settings(settings)
+                .addPlugin(DeleteByQueryPlugin.class)
+                .build()
                 .addTransportAddresses(transportAddresses.toArray(new TransportAddress[transportAddresses.size()]));
 
         logger.info("init es cluster.name[" + clusterName + "] client success...|" + eslist);
@@ -351,6 +359,22 @@ public class EsClient {
     }
 
     /**
+     * 检查索引/类型是否存在
+     * @param indexOrType
+     * @return
+     * @throws SqlParseException
+     * @throws SQLFeatureNotSupportedException
+     */
+    public boolean exist(String indexOrType) throws SqlParseException, SQLFeatureNotSupportedException {
+        if(StringUtils.isEmpty(indexOrType)) new EsOperationException("indexOrType can not be null...");
+        if (searchDao == null) throw new EsOperationException("sql searchDao is null, You must call the queryAsSQL() method when this method is called...");
+
+        String query = "show " + indexOrType;
+        SqlElasticRequestBuilder requestBuilder =  searchDao.explain(query).explain();
+        return !((GetIndexResponse) requestBuilder.get()).getMappings().isEmpty();
+    }
+
+    /**
      * 模拟sql查询
      * @param query
      * @return
@@ -358,14 +382,14 @@ public class EsClient {
      * @throws SQLFeatureNotSupportedException
      * @throws SQLFeatureNotSupportedException
      */
-    public SqlResponse select(String query) throws SqlParseException, SQLFeatureNotSupportedException, SQLFeatureNotSupportedException {
-        if (searchDao == null) throw new EsOperationException("sql searchDao is null, you must call EsClient.queryAsSQL...");
+    public SqlResponse select(String query) throws SqlParseException, SQLFeatureNotSupportedException {
+        if (searchDao == null) throw new EsOperationException("sql searchDao is null, You must call the queryAsSQL() method when this method is called...");
         SqlElasticSearchRequestBuilder select = (SqlElasticSearchRequestBuilder) searchDao.explain(query).explain();
         return new SqlResponse((SearchResponse)select.get());
     }
 
     public EsClient queryAsSQL(){
-        this.searchDao = new SearchDao(client);
+        if(this.searchDao == null) this.searchDao = new SearchDao(client);
         return this;
     }
 
@@ -384,6 +408,43 @@ public class EsClient {
         if (searchDao == null) throw new EsOperationException("sql searchDao is null, you must call EsClient.queryAsSQL...");
         SqlElasticRequestBuilder requestBuilder = searchDao.explain(sql).explain();
         return requestBuilder.explain();
+    }
+
+    /**
+     *
+     * @param _index
+     * @param _type
+     * @return
+     */
+    /*public void delete(String _index, String _type) throws ExecutionException, InterruptedException {
+        if(_type == null) throw new EsOperationException("_type is null...");
+
+        DeleteByQueryRequestBuilder deleteQuery = new DeleteByQueryRequestBuilder(client, DeleteByQueryAction.INSTANCE);
+
+        deleteQuery.setIndices(_index);
+        if (_type != null) {
+            deleteQuery.setTypes(_type);
+        }
+        deleteQuery.setQuery(QueryBuilders.matchAllQuery());
+
+        deleteQuery.execute().actionGet();
+    }*/
+
+    /**
+     * 删除数据
+     * delete * from my_test/book
+     * or delete * from my_test/book where id='1'
+     * 此方法用到了delete-by-query插件,服务端也需要安装对应版本的插件才可以使用,否则会有各种异常
+     * client对象要使用addPlugin(DeleteByQueryPlugin.class)使用插件
+     * @param deleteStatement
+     * @throws SQLFeatureNotSupportedException
+     * @throws SqlParseException
+     */
+    public ActionResponse delete(String deleteStatement) throws SQLFeatureNotSupportedException, SqlParseException {
+        if(StringUtils.isEmpty(deleteStatement)) throw new EsOperationException("deleteStatement can not be null..");
+        if (searchDao == null) throw new EsOperationException("sql searchDao is null, you must call EsClient.queryAsSQL...");
+
+        return searchDao.explain(deleteStatement).explain().get();
     }
 
     /**
