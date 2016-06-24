@@ -6,6 +6,7 @@ import com.google.common.base.Splitter;
 import com.retail.datahub.es.exception.EsOperationException;
 import com.retail.datahub.es.model.Response;
 import com.retail.datahub.es.model.SqlResponse;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.elasticsearch.action.ActionResponse;
 import org.elasticsearch.action.admin.indices.get.GetIndexResponse;
@@ -21,6 +22,7 @@ import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.InetSocketTransportAddress;
 import org.elasticsearch.common.transport.TransportAddress;
+import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.MultiMatchQueryBuilder;
@@ -113,6 +115,7 @@ public class EsClient {
 
         Settings settings = Settings.settingsBuilder()
                 .put("cluster.name", clusterName)
+                .put("client.transport.sniff", sniff)
                 .build();
 
         this.client = TransportClient.builder()
@@ -152,7 +155,7 @@ public class EsClient {
      * @throws EsOperationException
      */
     public BulkResponse batchIndex(String _index, String _type, List<String> jsons) throws EsOperationException {
-        if (jsons == null) throw new EsOperationException("jsons is null or empty...");
+        if (CollectionUtils.isEmpty(jsons)) throw new EsOperationException("jsons is null or empty...");
 
         BulkRequestBuilder bulkRequest = client.prepareBulk();
 
@@ -177,6 +180,7 @@ public class EsClient {
      * @return
      * @throws EsOperationException
      */
+    @Deprecated
     public <T> BulkResponse batchObjIndex(String _index, String _type, List<T> data) throws EsOperationException {
         if (data == null) throw new EsOperationException("data is null or empty...");
 
@@ -204,6 +208,48 @@ public class EsClient {
         return bulkResponse;
     }
 
+
+    /**
+     * 批量新增
+     * generate_id  是否需要es生成id, true:es自动生成,false:对象中的id
+     * @param _index
+     * @param _type
+     * @param data
+     * @param generate_id
+     * @param <T>
+     * @return
+     * @throws EsOperationException
+     */
+    public <T> BulkResponse batchObjIndex(String _index, String _type, List<T> data, boolean generate_id) throws EsOperationException {
+        if (CollectionUtils.isEmpty(data)) throw new EsOperationException("data is null or empty...");
+
+        BulkRequestBuilder bulkRequest = client.prepareBulk();
+
+        for (T tObj : data) {
+            Class clazz = tObj.getClass();
+            String json = JSONObject.toJSONString(tObj, SerializerFeature.WriteMapNullValue);
+
+            if(generate_id){
+                bulkRequest.add(client.prepareIndex(_index.toLowerCase(), _type.toLowerCase()).setSource(json));
+            } else {
+                try {
+                    Object value = clazz.getDeclaredMethod("getId").invoke(tObj);
+                    String _id = String.valueOf(value);
+                    bulkRequest.add(client.prepareIndex(_index.toLowerCase(), _type.toLowerCase(), _id).setSource(json));
+                } catch (Exception e) {
+                    throw new EsOperationException("调用" + clazz.getName() + "实例getId方法错误", e);
+                }
+            }
+        }
+
+        BulkResponse bulkResponse = bulkRequest.execute().actionGet();
+        if (bulkResponse.hasFailures()) {
+            throw new EsOperationException("batchIndex error," + bulkResponse.buildFailureMessage());
+        }
+
+        return bulkResponse;
+    }
+
     /**
      *
      * 更新数据
@@ -212,7 +258,7 @@ public class EsClient {
         if (_index == null) throw new EsOperationException("_index is null or empty...");
         if (_type == null) throw new EsOperationException("_type is null or empty...");
         if (_id == null) throw new EsOperationException("_id is null or empty...");
-        if (data == null) throw new EsOperationException("data is null or empty...");
+        if (data == null || CollectionUtils.isEmpty(data.entrySet())) throw new EsOperationException("data is null or empty...");
 
         UpdateRequest updateRequest = new UpdateRequest();
         updateRequest.index(_index.toLowerCase()).type(_type.toLowerCase()).id(_id);
@@ -367,7 +413,7 @@ public class EsClient {
      */
     public boolean exist(String indexOrType) throws SqlParseException, SQLFeatureNotSupportedException {
         if(StringUtils.isEmpty(indexOrType)) new EsOperationException("indexOrType can not be null...");
-        if (searchDao == null) throw new EsOperationException("sql searchDao is null, You must call the queryAsSQL() method when this method is called...");
+        if (searchDao == null) throw new EsOperationException("sql searchDao is null, You must call the asSql() method when this method is called...");
 
         String query = "show " + indexOrType;
         SqlElasticRequestBuilder requestBuilder =  searchDao.explain(query).explain();
@@ -383,15 +429,26 @@ public class EsClient {
      * @throws SQLFeatureNotSupportedException
      */
     public SqlResponse select(String query) throws SqlParseException, SQLFeatureNotSupportedException {
-        if (searchDao == null) throw new EsOperationException("sql searchDao is null, You must call the queryAsSQL() method when this method is called...");
+        if (searchDao == null) throw new EsOperationException("sql searchDao is null, You must call the asSql() method when this method is called...");
         SqlElasticSearchRequestBuilder select = (SqlElasticSearchRequestBuilder) searchDao.explain(query).explain();
         return new SqlResponse((SearchResponse)select.get());
     }
 
+    /**
+     * see asSql
+     * @return
+     */
+    @Deprecated
     public EsClient queryAsSQL(){
         if(this.searchDao == null) this.searchDao = new SearchDao(client);
         return this;
     }
+
+    public EsClient asSql(){
+        if(this.searchDao == null) this.searchDao = new SearchDao(client);
+        return this;
+    }
+
 
     /**
      * sql翻译成es查询DSL
@@ -405,7 +462,7 @@ public class EsClient {
      * @throws IOException
      */
     public String explain(String sql) throws SQLFeatureNotSupportedException, SqlParseException, InvocationTargetException, NoSuchMethodException, IllegalAccessException, IOException {
-        if (searchDao == null) throw new EsOperationException("sql searchDao is null, you must call EsClient.queryAsSQL...");
+        if (searchDao == null) throw new EsOperationException("sql searchDao is null, you must call EsClient.asSql...");
         SqlElasticRequestBuilder requestBuilder = searchDao.explain(sql).explain();
         return requestBuilder.explain();
     }
@@ -442,9 +499,21 @@ public class EsClient {
      */
     public ActionResponse delete(String deleteStatement) throws SQLFeatureNotSupportedException, SqlParseException {
         if(StringUtils.isEmpty(deleteStatement)) throw new EsOperationException("deleteStatement can not be null..");
-        if (searchDao == null) throw new EsOperationException("sql searchDao is null, you must call EsClient.queryAsSQL...");
+        if (searchDao == null) throw new EsOperationException("sql searchDao is null, you must call EsClient.asSql...");
 
         return searchDao.explain(deleteStatement).explain().get();
+    }
+
+
+    /**
+     * 批量滚动查询
+     * @param scrollId
+     * @param timeout
+     * @return
+     */
+    public SqlResponse scroll(String scrollId, long timeout){
+        SearchResponse response = client.prepareSearchScroll(scrollId).setScroll(new TimeValue(timeout)).execute().actionGet();
+        return new SqlResponse(response);
     }
 
     /**
