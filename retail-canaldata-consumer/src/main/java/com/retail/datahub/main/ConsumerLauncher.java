@@ -31,6 +31,8 @@ public class ConsumerLauncher extends BaseCanalClient{
     private static final String CLASSPATH_URL_PREFIX = "classpath:";
     private static final Logger logger               = LoggerFactory.getLogger(ConsumerLauncher.class);
     private static final Logger errorLogger          = LoggerFactory.getLogger("msg-error");
+    private static final Logger binlogLogger         = LoggerFactory.getLogger("binlog-msg");
+    private static final Logger heartbeatLogger      = LoggerFactory.getLogger("heartbeat-msg");
 
     private String zkList;
 
@@ -38,6 +40,9 @@ public class ConsumerLauncher extends BaseCanalClient{
     private String topic_suffix;
 
     private DefaultEventProduct mysqlLogProduct;
+
+    //用于对比
+    private static String upJson = "";
 
     public static void main(String[] args) throws Throwable{
         try {
@@ -56,7 +61,7 @@ public class ConsumerLauncher extends BaseCanalClient{
 
             final ConsumerLauncher consumerLauncher = new ConsumerLauncher();
             consumerLauncher.readResouse(properties);
-            CanalConnector connector = CanalConnectors.newClusterConnector(consumerLauncher.zkList, consumerLauncher.destination, consumerLauncher.username, consumerLauncher.password);
+            CanalConnector connector = CanalConnectors.newClusterConnector(consumerLauncher.zkList, consumerLauncher.destination, "", "");
             consumerLauncher.setConnector(connector);
             consumerLauncher.start();
 
@@ -112,6 +117,8 @@ public class ConsumerLauncher extends BaseCanalClient{
 
     @Override
     public void processData(List<EventBatchModel> eventBatchModels) throws ProcessDataException {
+        //TODO
+
         for(EventBatchModel eventBatchModel : eventBatchModels){
             String msg = "";
             String topic;
@@ -126,11 +133,24 @@ public class ConsumerLauncher extends BaseCanalClient{
 
             try {
                 msg = JSONObject.toJSONString(eventBatchModel, SerializerFeature.WriteMapNullValue);
-                mysqlLogProduct.send(topic, msg);
-                logger.debug("msg:" + msg);
+
+                //检查msg数据是否重复,如果重复不处理
+                if(!StringUtils.equals(msg, upJson)){
+                    //心跳表另外处理
+                    if(StringUtils.equals("heartbeat", eventBatchModel.getRealTableName())) {
+                        heartbeatLogger.info(String.format("心跳表:%s.%s|%s", eventBatchModel.getDbName(),
+                                eventBatchModel.getRealTableName(),
+                                JSONObject.toJSONString(eventBatchModel.getRowData()[0].getAfterColumns())));
+                    } else {
+                        mysqlLogProduct.send(topic, msg);
+                        binlogLogger.info(String.format("topic:%s,size:%d,msg:%s", topic, eventBatchModels.size(), msg));
+                    }
+                }
+                upJson = msg;
             } catch (Exception e){
-                errorLogger.error("send msg to topic [" + topic + "] error...", e);
-                errorLogger.info("unsent msg:" + msg);
+                upJson = "";
+                errorLogger.error(String.format("send msg to topic [%s] error...", topic), e);
+                errorLogger.info(String.format("unsent msg:%s", msg));
 
                 throw new ProcessDataException(e);
             }

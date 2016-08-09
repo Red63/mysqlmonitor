@@ -86,7 +86,8 @@ if [ -e $listener_conf -a -e $logback_configurationFile ]; then
 	echo LOG CONFIGURATION : $logback_configurationFile
 	echo listener conf : $listener_conf
 	echo CLASSPATH :$CLASSPATH
-	$JAVA $JAVA_OPTS $JAVA_DEBUG_OPT $CANAL_OPTS -classpath .:$CLASSPATH com.retail.datahub.main.ConsumerLauncher 1>>$base/logs/nohup.out 2>&1 &
+	$JAVA $JAVA_OPTS $JAVA_DEBUG_OPT $CANAL_OPTS -classpath .:$CLASSPATH com.retail.datahub.main.ConsumerLauncher &
+##	$JAVA $JAVA_OPTS $JAVA_DEBUG_OPT $CANAL_OPTS -classpath .:$CLASSPATH com.retail.datahub.main.ConsumerLauncher 1>>$base/logs/nohup.out 2>&1 &
 	echo $! > $base/bin/hamal.pid 
 	
 	echo "cd to $current_path for continue"

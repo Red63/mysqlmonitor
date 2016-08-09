@@ -41,6 +41,7 @@ import java.beans.BeanInfo;
 import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
@@ -56,7 +57,7 @@ import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
  * date: 2016/5/9 13:42 <br/>
  *
  * @author Red(luohong@retail-tek.com)
- * @version 1.0.0
+ * @version 2.3.3.5
  */
 public class EsClient {
 
@@ -86,6 +87,16 @@ public class EsClient {
 
     public void setClusterName(String clusterName) {
         this.clusterName = clusterName;
+    }
+
+    public EsClient(){}
+
+    public EsClient(String eslist, String clusterName, Boolean sniff){
+        this.eslist = eslist;
+        this.clusterName = clusterName;
+        this.sniff = sniff;
+
+        init();
     }
 
     public void init() {
@@ -172,44 +183,6 @@ public class EsClient {
     }
 
     /**
-     * 批量插入传入数据对象中的ID字段
-     *
-     * @param _index
-     * @param _type
-     * @param data
-     * @return
-     * @throws EsOperationException
-     */
-    @Deprecated
-    public <T> BulkResponse batchObjIndex(String _index, String _type, List<T> data) throws EsOperationException {
-        if (data == null) throw new EsOperationException("data is null or empty...");
-
-        BulkRequestBuilder bulkRequest = client.prepareBulk();
-
-        for (T tObj : data) {
-            Class clazz = tObj.getClass();
-            Object value;
-            try {
-                value = clazz.getDeclaredMethod("getId").invoke(tObj);
-            } catch (Exception e) {
-                throw new EsOperationException("调用" + clazz.getName() + "实例getId方法错误", e);
-            }
-
-            String _id = String.valueOf(value);
-            String json = JSONObject.toJSONString(tObj, SerializerFeature.WriteMapNullValue);
-            bulkRequest.add(client.prepareIndex(_index.toLowerCase(), _type.toLowerCase(), _id).setSource(json));
-        }
-
-        BulkResponse bulkResponse = bulkRequest.execute().actionGet();
-        if (bulkResponse.hasFailures()) {
-            throw new EsOperationException("batchIndex error," + bulkResponse.buildFailureMessage());
-        }
-
-        return bulkResponse;
-    }
-
-
-    /**
      * 批量新增
      * generate_id  是否需要es生成id, true:es自动生成,false:对象中的id
      * @param _index
@@ -251,6 +224,104 @@ public class EsClient {
     }
 
     /**
+     * 传入的routing指定路由
+     * @param _index
+     * @param _type
+     * @param data
+     * @param generate_id
+     * @param routing
+     * @param <T>
+     * @return
+     * @throws EsOperationException
+     */
+    public <T> BulkResponse batchIndexByRouting(String _index, String _type, List<T> data, boolean generate_id, String routing) throws EsOperationException {
+        if (CollectionUtils.isEmpty(data)) throw new EsOperationException("data is null or empty...");
+
+        BulkRequestBuilder bulkRequest = client.prepareBulk();
+
+        for (T tObj : data) {
+            Class clazz = tObj.getClass();
+            String json = JSONObject.toJSONString(tObj, SerializerFeature.WriteMapNullValue);
+
+            if(generate_id){
+                bulkRequest.add(client.prepareIndex(_index.toLowerCase(), _type.toLowerCase()).setSource(json).setRouting(routing));
+            } else {
+                try {
+                    Object value = clazz.getDeclaredMethod("getId").invoke(tObj);
+                    String _id = String.valueOf(value);
+                    bulkRequest.add(client.prepareIndex(_index.toLowerCase(), _type.toLowerCase(), _id).setSource(json).setRouting(routing));
+                } catch (Exception e) {
+                    throw new EsOperationException("调用" + clazz.getName() + "实例getId方法错误", e);
+                }
+            }
+        }
+
+
+        BulkResponse bulkResponse = bulkRequest.execute().actionGet();
+        if (bulkResponse.hasFailures()) {
+            throw new EsOperationException("batchIndex error," + bulkResponse.buildFailureMessage());
+        }
+
+        return bulkResponse;
+    }
+
+    /**
+     * 实体中某个字段的值指定路由
+     * @param _index
+     * @param _type
+     * @param data
+     * @param generate_id
+     * @param field
+     * @param <T>
+     * @return
+     * @throws Exception
+     */
+    public <T> BulkResponse batchIndexByRoutingUseField(String _index, String _type, List<T> data, boolean generate_id, String field) throws Exception {
+        if (CollectionUtils.isEmpty(data)) throw new EsOperationException("data is null or empty...");
+
+        BulkRequestBuilder bulkRequest = client.prepareBulk();
+
+        for (T tObj : data) {
+            Class clazz = tObj.getClass();
+            Field[] fields = clazz.getDeclaredFields();
+            String fieldValue = null;
+            for (Field f: fields){
+                f.setAccessible(true);
+                if(StringUtils.equals(field, f.getName())){
+                    fieldValue = String.valueOf(f.get(tObj));
+                    break;
+                }
+            }
+
+            if(StringUtils.isEmpty(fieldValue)){
+                throw new EsOperationException("\"" + field + "\", field does not exist");
+            }
+
+            String json = JSONObject.toJSONString(tObj, SerializerFeature.WriteMapNullValue);
+
+            if(generate_id){
+                bulkRequest.add(client.prepareIndex(_index.toLowerCase(), _type.toLowerCase()).setSource(json).setRouting(fieldValue));
+            } else {
+                try {
+                    Object value = clazz.getDeclaredMethod("getId").invoke(tObj);
+                    String _id = String.valueOf(value);
+                    bulkRequest.add(client.prepareIndex(_index.toLowerCase(), _type.toLowerCase(), _id).setSource(json).setRouting(fieldValue));
+                } catch (Exception e) {
+                    throw new EsOperationException("调用" + clazz.getName() + "实例getId方法错误", e);
+                }
+            }
+
+        }
+
+        BulkResponse bulkResponse = bulkRequest.execute().actionGet();
+        if (bulkResponse.hasFailures()) {
+            throw new EsOperationException("batchIndex error," + bulkResponse.buildFailureMessage());
+        }
+
+        return bulkResponse;
+    }
+
+    /**
      *
      * 更新数据
      */
@@ -267,6 +338,58 @@ public class EsClient {
         for (Map.Entry entry : data.entrySet()){
             builder.field(String.valueOf(entry.getKey()), entry.getValue());
         }
+        builder.endObject();
+        updateRequest.doc(builder);
+
+        return  client.update(updateRequest).get();
+    }
+
+    /**
+     * 更新数据data实体对象中必须提供getId()方法,更新根据此id更新文档
+     * 更新数据,忽略了值为null的情况
+     * @param _index
+     * @param _type
+     * @param data
+     * @param <T>
+     * @return
+     * @throws Exception
+     */
+    public <T> UpdateResponse updateOne(String _index, String _type, T data) throws Exception{
+        if (_index == null) throw new EsOperationException("_index is null or empty...");
+        if (_type == null) throw new EsOperationException("_type is null or empty...");
+        if (data == null) throw new EsOperationException("data is null or empty...");
+
+        UpdateRequest updateRequest = new UpdateRequest();
+
+        Class clazz = data.getClass();
+        //获取id更新文档
+        try {
+            Object value = clazz.getDeclaredMethod("getId").invoke(data);
+            String _id = String.valueOf(value);
+            updateRequest.index(_index.toLowerCase()).type(_type.toLowerCase()).id(_id);
+
+        } catch (Exception e) {
+            throw new EsOperationException("调用" + clazz.getName() + "实例getId方法错误", e);
+        }
+
+        //构造builder
+        XContentBuilder builder = jsonBuilder().startObject();
+
+        Field[] fields = clazz.getDeclaredFields();
+        for (Field field : fields) {
+            String fieldName = field.getName();
+            field.setAccessible(true);
+            Object value = field.get(data);
+            if (value != null) {
+                if (field.getType().equals(Date.class)) {
+                    long time = ((Date) value).getTime();
+                    builder.field(fieldName, time);
+                } else {
+                    builder.field(fieldName, value);
+                }
+            }
+        }
+
         builder.endObject();
         updateRequest.doc(builder);
 
@@ -321,11 +444,6 @@ public class EsClient {
         SearchResponse response = baseQuery(_indices, _types, queryBuilder);
 
         return getResponse(response);
-    }
-
-    @Deprecated
-    public Response dateRangeSearch(List<String> _indices, Date start, Date end) {
-        return null;
     }
 
     public Response dateRangeSearch(List<String> _indices, String field, Date start, Date end) {
@@ -395,11 +513,6 @@ public class EsClient {
         return getResponse(response);
     }
 
-    @Deprecated
-    public Response dateRangeForValueSearch(List<String> _indices, String value, Date start, Date end) {
-        return null;
-    }
-
     public Response dateRangeForValueSearch(List<String> _indices, String value, String field, Date start, Date end) {
         return dateRangeForValueSearch(_indices, null, field, value, start, end);
     }
@@ -434,15 +547,6 @@ public class EsClient {
         return new SqlResponse((SearchResponse)select.get());
     }
 
-    /**
-     * see asSql
-     * @return
-     */
-    @Deprecated
-    public EsClient queryAsSQL(){
-        if(this.searchDao == null) this.searchDao = new SearchDao(client);
-        return this;
-    }
 
     public EsClient asSql(){
         if(this.searchDao == null) this.searchDao = new SearchDao(client);

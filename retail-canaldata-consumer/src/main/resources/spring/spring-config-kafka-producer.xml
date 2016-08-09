@@ -48,7 +48,7 @@
 		<property name="codeFactory" ref="codeFactory"></property>
 	</bean>
 
-	<!-- 生成者 -->
+	<!-- 生产者 -->
 	<bean id="mysqlLogProduct" class="com.retail.commons.dkafka.product.DefaultEventProduct">
 		<property name="product" ref="dmgProducer"></property>
 		<property name="messageAdapterHandler" ref="productMessageAdapterHandler"></property>

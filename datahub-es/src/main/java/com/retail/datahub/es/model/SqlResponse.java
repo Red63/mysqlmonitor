@@ -165,12 +165,7 @@ public class SqlResponse {
         List<Map<String, Object>> buckets = (List<Map<String, Object>>) parentValue.get("buckets");
 
         if(buckets == null){
-            if(parentValue.get("value") != null){
-                row.put(parentKey, parentValue.get("value"));
-            } else {
-                row.put(parentKey, null);
-            }
-
+            row.put(parentKey, parentValue.get("value"));
             rows.add(row);
         } else {
             getSubBuckets(buckets, parentKey);
@@ -197,6 +192,7 @@ public class SqlResponse {
             List<String> subkeys = subKey(map);
 
             for (String subKey: subkeys){
+
                 List<Map<String, Object>> subs = null;
                 if(StringUtils.isNotEmpty(subKey)){
                     subs = (List<Map<String, Object>>) ((Map<String, Object>) map.get(subKey)).get("buckets");
@@ -205,11 +201,12 @@ public class SqlResponse {
                 if(subs == null){
                     Map<String, Object> endMap = (Map<String, Object>) map.get(subKey);
                     if(endMap != null){
-                        if(endMap.get("value") != null){
-                            row.put(subKey, endMap.get("value"));
+                        if(endMap.size() > 1){
+                            row.putAll(endMap);
                         } else {
-                            row.put(subKey, null);
+                            row.put(subKey, endMap.get("value"));
                         }
+
                     }
 
                     callChild = false;

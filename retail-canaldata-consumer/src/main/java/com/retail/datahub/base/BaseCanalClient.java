@@ -26,6 +26,7 @@ import java.util.List;
 public abstract class BaseCanalClient {
 
     protected final static Logger logger = LoggerFactory.getLogger(BaseCanalClient.class);
+    private static final Logger errorLogger = LoggerFactory.getLogger("msg-error");
     protected static final String SEP = SystemUtils.LINE_SEPARATOR;
     protected static final String DATE_FORMAT = "yyyy-MM-dd HH:mm:ss";
     protected volatile boolean running = false;
@@ -85,9 +86,8 @@ public abstract class BaseCanalClient {
     }
 
 
-
     protected void start() {
-        if (connector == null){
+        if (connector == null) {
             logger.error("connector is null");
         }
         thread = new Thread(new Runnable() {
@@ -134,12 +134,12 @@ public abstract class BaseCanalClient {
             //check db and table
             db = entry.getHeader().getSchemaName();
             table = entry.getHeader().getTableName();
-            if(StringUtils.isEmpty(db)) continue;
-            if(StringUtils.isEmpty(table)) continue;
-            if(StringUtils.isNotEmpty(listenerdb) && listenerdb.indexOf(db) < 0){
+            if (StringUtils.isEmpty(db)) continue;
+            if (StringUtils.isEmpty(table)) continue;
+            if (StringUtils.isNotEmpty(listenerdb) && listenerdb.indexOf(db) < 0) {
                 continue;
             } else {
-                if(StringUtils.isNotEmpty(listenertable) && listenertable.indexOf(table) < 0) continue;
+                if (StringUtils.isNotEmpty(listenertable) && listenertable.indexOf(table) < 0) continue;
             }
 
             long executeTime = entry.getHeader().getExecuteTime();
@@ -192,7 +192,7 @@ public abstract class BaseCanalClient {
                 EventType eventType = rowChage.getEventType();
 
                 //check event
-                if(StringUtils.isNotEmpty(event) && event.indexOf(eventType.name()) < 0) continue;
+                if (StringUtils.isNotEmpty(event) && event.indexOf(eventType.name()) < 0) continue;
 
                 eventBatchModel.setBatchId(batchId);
                 eventBatchModel.setDbName(db);
@@ -216,7 +216,7 @@ public abstract class BaseCanalClient {
 
                 RowDataModel[] rowDataModels = new RowDataModel[rowChage.getRowDatasList().size()];
 
-                for(int j = 0; j<rowChage.getRowDatasList().size(); j++){
+                for (int j = 0; j < rowChage.getRowDatasList().size(); j++) {
                     RowData rowData = rowChage.getRowDatasList().get(j);
                     ColumnModel columnModel = new ColumnModel();
 
@@ -251,10 +251,10 @@ public abstract class BaseCanalClient {
     }
 
     protected ColumnModel[] getColumn(List<Column> columns) {
-        if(columns == null || columns.size()==0) return null;
+        if (columns == null || columns.size() == 0) return null;
         ColumnModel[] columnModels = new ColumnModel[columns.size()];
 
-        for (int i=0; i<columns.size(); i++){
+        for (int i = 0; i < columns.size(); i++) {
             ColumnModel columnModel = new ColumnModel();
             Column column = columns.get(i);
 
@@ -287,26 +287,26 @@ public abstract class BaseCanalClient {
         this.connector = connector;
     }
 
-    protected void process(){
+    protected void process() {
         int batchSize = 5 * 1024;
         while (running) {
             try {
                 MDC.put("destination", destination);
 
-                //logger.info("线程:" + thread.getName() +"处理任务");
-
                 //防止服务挂掉导致无限打印错误日志,退出循环监听
-                if(delayCount > 100){
+
+                if (delayCount > 10) {
+                    connector.disconnect();
+                    MDC.remove("destination");
                     logger.error("由于canal服务无法连接,现在终止程序.监听binlog失效,请重启程序.....");
                     stop();
-                    //break;
+                } else {
+                    try {
+                        if (delayTimes > 0) thread.sleep(delayTimes);
+                    } catch (InterruptedException e) {
+                        logger.error("线程睡眠异常:", e);
+                    }
                 }
-                try {
-                    thread.sleep(delayTimes);
-                } catch (InterruptedException e) {
-                    logger.error("线程睡眠异常:", e);
-                }
-
 
                 connector.connect();
                 connector.subscribe();
@@ -320,18 +320,15 @@ public abstract class BaseCanalClient {
                         // } catch (InterruptedException e) {
                         // }
                     } else {
-                        List<EventBatchModel> eventBatchModels = fetchData(message.getEntries(), batchId);
-                        if (eventBatchModels != null && eventBatchModels.size() >0 ){
+                        try {
+                            processData(fetchData(message.getEntries(), batchId));
 
-                            try {
-                                processData(eventBatchModels);
-
-                                connector.ack(batchId); // 提交确认
-                            } catch (ProcessDataException e){
-                                connector.rollback(batchId); // 处理失败, 回滚数据
-                            }
-
+                            connector.ack(batchId); // 提交确认
+                        } catch (ProcessDataException e) {
+                            connector.rollback(batchId); // 处理失败, 回滚数据
+                            errorLogger.error("处理数据异常,执行rollback,batchId=" + batchId, e);
                         }
+
 
                     }
 
@@ -339,7 +336,7 @@ public abstract class BaseCanalClient {
                 delayTimes = 0;
                 delayCount = 0;
             } catch (CanalClientException e) {
-                delayTimes = delayTimes*2;
+                delayTimes = delayTimes * 2;
                 delayCount++;
                 logger.error("process error!", e);
             } finally {
@@ -354,7 +351,7 @@ public abstract class BaseCanalClient {
     }
 
     public void setCanalport(String canalport) {
-        if(StringUtils.isEmpty(canalport)){
+        if (StringUtils.isEmpty(canalport)) {
             this.port = 11111;
         } else {
             this.port = Integer.valueOf(canalport);
